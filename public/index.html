@@ -57,39 +57,7 @@ let raf = null;
 
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function ease(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
-function wrapText(text, maxWidth, font, maxLines=2){
-  if(!text) return [];
-  ctx.save(); ctx.font=font;
-  const words=String(text).trim().split(/\s+/);
-  const lines=[]; let line=''; let wi=0;
-  for(const word of words){
-    const test=line ? line+' '+word : word;
-    if(ctx.measureText(test).width <= maxWidth){ line=test; continue; }
-    if(line) lines.push(line);
-    line=word;
-    if(lines.length >= maxLines-1){
-      let rest=[line,...words.slice(wi+1)].join(' ');
-      while(rest.length>1 && ctx.measureText(rest+'…').width > maxWidth) rest=rest.slice(0,-1);
-      lines.push(rest+'…'); ctx.restore(); return lines;
-    }
-    wi++;
-  }
-  if(line) lines.push(line);
-  ctx.restore(); return lines.slice(0,maxLines);
-}
-function measureWithFont(text,font){ctx.save();ctx.font=font;const w=ctx.measureText(text).width;ctx.restore();return w;}
-function fitFont(text,maxWidth,base=24,min=14){let size=base;while(size>min){if(measureWithFont(text,`700 ${size}px system-ui`)<=maxWidth)return size;size--;}return min;}
-function boxMetrics(it){
-  const maxW=300, inner=maxW-36;
-  const labelSize=fitFont(it.label,inner,24,14);
-  const labelLines=wrapText(it.label,inner,`700 ${labelSize}px system-ui`,2);
-  const detailSize=fitFont(it.detail||'',inner,16,12);
-  const detailLines=wrapText(it.detail||'',inner,`${detailSize}px system-ui`,2);
-  const widest=Math.max(0,...labelLines.map(t=>measureWithFont(t,`700 ${labelSize}px system-ui`)),...detailLines.map(t=>measureWithFont(t,`${detailSize}px system-ui`)));
-  const w=Math.max(210,Math.min(maxW,widest+36));
-  const h=detailLines.length?132:(labelLines.length>1?124:110);
-  return {w,h,labelSize,detailSize,labelLines,detailLines};
-}
+function textFit(text,max){return text.length>max?text.slice(0,max-1)+'…':text;}
 
 function layout(scene){
   const n=scene.items.length;
@@ -110,9 +78,10 @@ function drawScene(now){
     ctx.strokeStyle=dark?'#64748b':'#9aa8ba'; ctx.lineWidth=7; ctx.lineCap='round';
     for(let i=0;i<positions.length-1;i++){
       const a=positions[i],b=positions[i+1];
-      const aw=boxMetrics(scene.items[i]).w/2, bw=boxMetrics(scene.items[i+1]).w/2;
-      if(scene.scene_type==='timeline' || scene.scene_type==='process_flow'){
-        ctx.beginPath();ctx.moveTo(a.x+aw,a.y);ctx.lineTo(b.x-bw,b.y);ctx.stroke();
+      if(scene.scene_type==='timeline'){
+        ctx.beginPath();ctx.moveTo(a.x+90,a.y);ctx.lineTo(b.x-90,b.y);ctx.stroke();
+      }else if(scene.scene_type==='process_flow'){
+        ctx.beginPath();ctx.moveTo(a.x+105,a.y);ctx.lineTo(b.x-105,b.y);ctx.stroke();
       }
     }
   }
@@ -130,12 +99,22 @@ function drawScene(now){
       if(a.type==='move') dx+=60*e;
     }
     ctx.save(); ctx.globalAlpha=opacity; ctx.translate(dx,0); ctx.translate(pos.x,pos.y); ctx.scale(scale,scale);
-    const w=210,h=120;
+    const m=boxMetrics(it);
+    const w=m.w,h=m.h;
     ctx.fillStyle=highlight?(dark?'#f59e0b':'#fde68a'):(dark?'#1e293b':'#ffffff');
     ctx.strokeStyle=highlight?(dark?'#f59e0b':'#d97706'):(dark?'#475569':'#cbd5e1'); ctx.lineWidth=5;
     roundRect(ctx,-w/2,-h/2,w,h,20); ctx.fill();ctx.stroke();
-    ctx.fillStyle=dark?'#f8fafc':'#172033'; ctx.font='700 24px system-ui'; ctx.fillText(textFit(it.label,18),0,-5);
-    if(it.detail){ctx.fillStyle=dark?'#cbd5e1':'#667085';ctx.font='16px system-ui';ctx.fillText(textFit(it.detail,26),0,29);}
+    ctx.fillStyle=dark?'#f8fafc':'#172033';
+    ctx.font=`700 ${m.labelSize}px system-ui`;
+    const labelLineH=m.labelSize+4;
+    const labelStart=-((m.labelLines.length-1)*labelLineH)/2-(m.detailLines.length?18:0);
+    m.labelLines.forEach((line,idx)=>ctx.fillText(line,0,labelStart+idx*labelLineH));
+    if(m.detailLines.length){
+      ctx.fillStyle=dark?'#cbd5e1':'#667085'; ctx.font=`${m.detailSize}px system-ui`;
+      const detailStart=labelStart+m.labelLines.length*labelLineH+12;
+      const detailLineH=m.detailSize+4;
+      m.detailLines.forEach((line,idx)=>ctx.fillText(line,0,detailStart+idx*detailLineH));
+    }
     ctx.restore();
   }
   if(elapsed < scene.duration + 1) raf=requestAnimationFrame(drawScene);
