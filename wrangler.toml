@@ -1,4 +1,3 @@
-name = "text2anim-basic"
-compatibility_date = "2026-09-01"
-[assets]
-directory = "./public"
+name = "text2anim"
+compatibility_date = "2026-09-13"
+pages_build_output_dir = "public"
