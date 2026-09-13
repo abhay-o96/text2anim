@@ -58,6 +58,30 @@ let raf = null;
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function ease(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
 function textFit(text,max){return text.length>max?text.slice(0,max-1)+'…':text;}
+function wrapText(text, maxChars){
+  const words=String(text||'').trim().split(/\s+/).filter(Boolean);
+  if(!words.length) return [''];
+  const lines=[]; let line='';
+  for(const word of words){
+    const candidate=line?line+' '+word:word;
+    if(candidate.length<=maxChars){ line=candidate; }
+    else { if(line) lines.push(line); line=word; }
+  }
+  if(line) lines.push(line);
+  return lines.slice(0,3);
+}
+function boxMetrics(it){
+  const label=String(it?.label||'');
+  const detail=String(it?.detail||'');
+  const labelLines=wrapText(label, 18);
+  const detailLines=wrapText(detail, 24);
+  const longest=Math.max(...labelLines.map(x=>x.length), ...detailLines.map(x=>x.length), 6);
+  const w=Math.max(190, Math.min(310, 110 + longest*8));
+  const labelSize=labelLines.length>=3 ? 22 : (labelLines.length===2 ? 25 : 28);
+  const detailSize=detailLines.length>=3 ? 16 : 18;
+  const h=70 + labelLines.length*labelSize + (detailLines.length ? detailLines.length*detailSize + 16 : 0);
+  return {w,h,labelLines,detailLines,labelSize,detailSize};
+}
 
 function layout(scene){
   const n=scene.items.length;
