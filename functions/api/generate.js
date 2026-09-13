@@ -1,4 +1,4 @@
-const MODEL = "gemini-2.5-flash-lite";
+const MODEL = "gemini-3.5-flash-lite";
 
 const SCENE_SCHEMA = {
   type: "object",
@@ -74,17 +74,26 @@ Prefer 3-7 items. Make the sequence understandable without narration.
 Do not output code. Do not invent extra properties.
 User request:\n${prompt}`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+    const url = "https://generativelanguage.googleapis.com/v1beta/interactions";
     const upstream = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": env.GEMINI_API_KEY,
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: instruction }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: SCENE_SCHEMA,
-          temperature: 0.2,
+        model: MODEL,
+        input: instruction,
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema: SCENE_SCHEMA,
         },
+        generation_config: {
+          thinking_level: "minimal",
+          max_output_tokens: 1200,
+        },
+        store: false,
       }),
     });
 
@@ -93,7 +102,8 @@ User request:\n${prompt}`;
       return new Response(JSON.stringify({ error: data?.error?.message || "Gemini request failed." }), { status: 502, headers: corsHeaders() });
     }
 
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = data?.output_text
+      || data?.steps?.slice().reverse().find((step) => step?.type === "model_output")?.content?.find((item) => item?.type === "text")?.text;
     if (!text) {
       return new Response(JSON.stringify({ error: "Gemini returned no scene." }), { status: 502, headers: corsHeaders() });
     }
